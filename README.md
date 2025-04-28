@@ -322,6 +322,112 @@ else:
 Судя по показятелям, эффективнее всего использовать метод copy_expert(), но и io.StringIO не так сильно отличается по скорости. Однако, среди трех методов есть явный аутсайдер, и это-pandas.to_sql().
 
 ## Выполнение индивидуальных заданий
+# Создание функций
+Ниже я размещу шаблон, который открывает, закрывает соединение, также в нем прописаны функции для выполнения последующих индивидуальных задач. Обратите внимание, что коды не будут работать без них.
+````
+import psycopg2
+import pandas as pd
+import matplotlib.pyplot as plt
+import os
+from io import StringIO
+
+# --- Константы для подключения к PostgreSQL ---
+DB_USER = "postgres"
+DB_PASSWORD = "1"
+DB_HOST = "localhost"
+DB_PORT = "5432"
+DB_NAME = "lect_08_bda_big_data"       
+
+# Определение констант
+small_table_name = 'sales_small'
+big_table_name = 'sales_big'
+small_csv_path = r'C:\Users\damdi\Desktop\уник\Практикум sql\data\upload_test_data.csv'  
+big_csv_path = r'C:\Users\damdi\Desktop\уник\Практикум sql\data\upload_test_data_big.csv'
+
+# Подключение к БД
+def connect_db():
+    try:
+        connection = psycopg2.connect(
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD,
+            host=DB_HOST,
+            port=DB_PORT
+        )
+        cursor = connection.cursor()
+        print("Успешное подключение к PostgreSQL")
+        return connection, cursor
+    except Exception as e:
+        print(f"Ошибка подключения к PostgreSQL: {e}")
+        return None, None
+
+# Функция для создания таблицы
+def create_table(table_name):
+    try:
+        cursor.execute(f"""
+        CREATE TABLE {table_name} (
+            id INTEGER PRIMARY KEY,
+            quantity INTEGER,
+            cost NUMERIC(10, 2),
+            total_revenue NUMERIC(12, 2)
+        );
+        """)
+        connection.commit()
+        print(f"Таблица {table_name} успешно создана или уже существует")
+    except Exception as e:
+        print(f"Ошибка при создании таблицы {table_name}: {e}")
+
+# Функция для загрузки данных из файла
+def load_via_copy_file(file_path, table_name):
+    try:
+        with open(file_path, 'r') as f:
+            cursor.copy_expert(f"""
+            COPY {table_name}(id, quantity, cost, total_revenue) 
+            FROM STDIN WITH CSV HEADER DELIMITER ','
+            """, f)
+        connection.commit()
+        print(f"Данные из {file_path} успешно загружены в {table_name}")
+    except Exception as e:
+        print(f"Ошибка при загрузке данных в {table_name}: {e}")
+
+# Функция для выполнения SQL запросов
+def execute_sql(query, fetch=False):
+    try:
+        cursor.execute(query)
+        connection.commit()
+        if fetch:
+            return cursor.fetchall()
+        return True
+    except Exception as e:
+        print(f"Ошибка выполнения SQL запроса: {e}")
+        return None
+
+# Функция для загрузки данных в DataFrame
+def load_df_from_sql(query):
+    try:
+        return pd.read_sql(query, connection)
+    except Exception as e:
+        print(f"Ошибка загрузки данных в DataFrame: {e}")
+        return None
+
+
+connection, cursor = connect_db()
+
+if not connection or not cursor:
+    print("Подключение к базе данных неактивно. Пожалуйста, проверьте параметры подключения.")
+else:
+    print("--- Запуск Варианта 12  ---")
+
+...
+
+    # Закрытие соединения
+    if cursor:
+        cursor.close()
+        if connection:
+             connection.close()
+print("\nСоединение с базой данных закрыто.")
+
+````
 # Задание 1. 	Создать таблицы sales_small, sales_big.
 Для создания таблицы необходимо посмотреть ее структуру, опираясь на созданную диаграмму 
 
@@ -329,79 +435,65 @@ else:
 
 Для выполнения задания составим код, создающий таблицы:
 ````
-
-import psycopg2
-from psycopg2 import Error
-
-# Функция для подключения к базе данных
-def get_connection():
-    try:
-        connection = psycopg2.connect(
-            user="postgres",
-            password="1",
-            host="localhost",
-            port="5432",
-            database="lect_08_bda_big_data"
-        )
-        return connection
-    except (Exception, Error) as error:
-        print(f"Error while connecting to PostgreSQL: {error}")
-        return None
-
-# Функция для закрытия соединения
-def close_connection(connection):
-    if connection:
-        connection.close()
-        print("PostgreSQL connection is closed.")
-
-# Основная функция для создания таблиц
-def create_tables():
-    connection = None
-    cursor = None
-    try:
-        connection = get_connection()
-        if connection:
-            cursor = connection.cursor()
-
-            tables = ["sales_small", "sales_big"]
-
-            for table_name in tables:
-                print(f"\nProcessing table '{table_name}'...")
-
-                # Удаление таблицы, если она существует
-                print(f"Dropping table '{table_name}' if it exists...")
-                cursor.execute(f"DROP TABLE IF EXISTS {table_name};")
-                connection.commit()
-                print(f"Table '{table_name}' dropped successfully or did not exist.")
-
-                create_table_query = f"""
-                CREATE TABLE {table_name} (
-                    id SERIAL PRIMARY KEY,
-                    product_name VARCHAR(255),
-                    quantity INTEGER,
-                    unit_price NUMERIC(10, 2),
-                    total_revenue NUMERIC(12, 2)
-                );
-                """
-                print(f"Creating table '{table_name}'...")
-                cursor.execute(create_table_query)
-                connection.commit()
-                print(f"Table '{table_name}' created successfully.")
-
-    except (Exception, Error) as error:
-        print(f"Error during table creation: {error}")
-        if connection:
-            connection.rollback()  # Откат изменений при ошибке
-
-    finally:
-   
-        if cursor:
-            cursor.close()
-        if connection:
-            close_connection(connection)
-create_tables()
+  #  Задание 1. Настройка таблиц. Создать таблицы sales_small, sales_big.
+    print("\n--- Задание 1. Создание таблиц sales_small, sales_big---")
+    create_table(small_table_name)
+    create_table(big_table_name)
 ````
 # Результат создания таблиц:
 ![image](https://github.com/user-attachments/assets/4fa126b5-3524-4c6b-90db-ded85a076431)
 
 Таблицы созданы
+
+# Задание 2. Загрузка малых данных, метод: copy_expert (StringIO)
+````
+    # Задание 2. Загрузка малых данных методом copy_expert (StringIO)
+    print(f"\n--- Задание 2: Загрузка данных из '{small_csv_path}' в '{small_table_name}' ---")
+    if os.path.exists(small_csv_path):
+        load_via_copy_stringio(small_csv_path, small_table_name)
+    else:
+        print(f"ОШИБКА: Файл '{small_csv_path}' не найден.")
+````
+
+
+# Задание 3. Загрузка больших данных, метод: copy_expert (file)
+````
+    # Задание 3. Загрузка больших данных методом copy_expert (file)
+    print(f"\n--- Задание 3: Загрузка данных из '{big_csv_path}' в '{big_table_name}' (метод file) ---")
+    if os.path.exists(big_csv_path):
+        load_via_copy_file(big_csv_path, big_table_name)
+    else:
+        print(f"ОШИБКА: Файл '{big_csv_path}' не найден. Загрузка не выполнена.")
+
+````
+
+
+# Задание 4. SQL Анализ:SQL: выбрать первые 15 записей из sales_big, отсортированных по cost (ASC).
+````
+   # Задание 4. SQL-запрос для выбора первых 15 записей из sales_big, отсортированных по cost (ASC)
+query = """
+SELECT *
+FROM sales_big
+ORDER BY cost ASC
+LIMIT 15;
+"""
+print("\n--- Задание 4: Выбрать первые 15 записей из sales_big, отсортированных по cost (ASC) ---")
+df = load_df_from_sql(query)
+
+# Проверяем результат
+if df is not None and not df.empty:
+    print("Данные успешно загружены:")
+    print(df)
+else:
+    print("Не удалось загрузить данные.")
+````
+# Результаты выполнения индивидуальной работы
+![image](https://github.com/user-attachments/assets/cdfca212-78e4-4efa-9955-bae7d88f67a6)
+
+# Выводы
+В рамках выполнения практической работы была проведена исследовательская задача по изучению и сравнению методов загрузки данных из CSV-файлов в СУБД PostgreSQL через VSCode. Работа позволила освоить ключевые аспекты взаимодействия с базами данных, анализа производительности различных подходов и выбора оптимальных решений для обработки данных разного объема.
+
+## Структура репозитория:
+- `erd_diagram.png` — ERD диаграмма схемы базы данных.
+- `Damdinova_Kristina_Takhirovna_Tasks` — Jupyter Notebook с выполнением задач практической работы, до индивидуальных заданий.
+- `Damdinova_Kristina_Takhirovna_V12` — Jupyter Notebook с выполнением индивидуальных заданий.
